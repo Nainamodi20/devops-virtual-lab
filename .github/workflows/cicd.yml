@@ -6,12 +6,54 @@ on:
       - master
 
 jobs:
-  build:
+  build-and-deploy:
     runs-on: ubuntu-latest
 
     steps:
+
       - name: Checkout code
         uses: actions/checkout@v4
 
       - name: Build Docker image
-        run: docker build -t devops-lab-app ./app
+        run: docker build -t devops-lab-app:latest ./app
+
+      - name: Save Docker image
+        run: docker save devops-lab-app:latest -o devops-lab-app.tar
+
+      - name: Configure SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/ec2_key
+          chmod 600 ~/.ssh/ec2_key
+          ssh-keyscan -H "${{ secrets.EC2_HOST }}" >> ~/.ssh/known_hosts
+
+      - name: Copy Docker image to EC2
+        run: |
+          scp -i ~/.ssh/ec2_key \
+            devops-lab-app.tar \
+            ec2-user@${{ secrets.EC2_HOST }}:/home/ec2-user/
+
+      - name: Copy Kubernetes files to EC2
+        run: |
+          scp -i ~/.ssh/ec2_key \
+            k8s/deployment.yml \
+            k8s/service.yml \
+            ec2-user@${{ secrets.EC2_HOST }}:/home/ec2-user/
+
+      - name: Deploy to Kubernetes
+        run: |
+          ssh -i ~/.ssh/ec2_key ec2-user@${{ secrets.EC2_HOST }} << 'EOF'
+
+          docker load -i /home/ec2-user/devops-lab-app.tar
+
+          sudo k3s ctr images import /home/ec2-user/devops-lab-app.tar
+
+          sudo k3s kubectl apply -f /home/ec2-user/deployment.yml
+          sudo k3s kubectl apply -f /home/ec2-user/service.yml
+
+          sudo k3s kubectl rollout status deployment/devops-lab-app
+
+          sudo k3s kubectl get pods
+          sudo k3s kubectl get service devops-lab-service
+
+          EOF
