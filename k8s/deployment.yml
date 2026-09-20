@@ -1,0 +1,20 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: devops-lab-app
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: devops-lab-app
+  template:
+    metadata:
+      labels:
+        app: devops-lab-app
+    spec:
+      containers:
+        - name: devops-lab-app
+          image: devops-lab-app:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 80

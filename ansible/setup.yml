@@ -1,0 +1,40 @@
+---
+- name: Configure DevOps Kubernetes Server
+  hosts: servers
+  become: yes
+
+  tasks:
+
+    - name: Install Docker
+      dnf:
+        name: docker
+        state: present
+
+    - name: Start and enable Docker
+      systemd:
+        name: docker
+        state: started
+        enabled: yes
+
+    - name: Add ec2-user to docker group
+      user:
+        name: ec2-user
+        groups: docker
+        append: yes
+
+    - name: Download K3s installation script
+      get_url:
+        url: https://get.k3s.io
+        dest: /tmp/install-k3s.sh
+        mode: '0755'
+
+    - name: Install K3s
+      command: /tmp/install-k3s.sh
+      args:
+        creates: /usr/local/bin/k3s
+
+    - name: Enable and start K3s
+      systemd:
+        name: k3s
+        state: started
+        enabled: yes
